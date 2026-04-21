@@ -2,7 +2,7 @@ import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import { SupabaseAdapter } from "@auth/supabase-adapter"
 
-const handler = NextAuth({
+export const authOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -13,18 +13,17 @@ const handler = NextAuth({
     url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
     secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
   }),
+  debug: true, // Это включит подробные логи в консоли Vercel
   callbacks: {
     async session({ session, user }: any) {
       if (session.user) {
-        // Добавляем ID пользователя в сессию, чтобы база знала, чей это чат
         session.user.id = user.id;
       }
       return session;
     },
   },
-  // Добавляем секрет для шифрования токенов
-  secret: process.env.NEXTAUTH_SECRET,
-})
+}
 
+const handler = NextAuth(authOptions)
 export { handler as GET, handler as POST }
 
