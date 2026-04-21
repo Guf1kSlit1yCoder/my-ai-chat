@@ -1,27 +1,38 @@
 import { NextResponse } from 'next/server';
-import Groq from 'groq-sdk';
+import { createClient } from '@supabase/supabase-js';
 
-const apiKey = process.env.GROQ_API_KEY;
-const groq = new Groq({ apiKey });
+// Инициализация Supabase
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json();
+    const { messages, userName } = await req.json();
+    const lastMessage = messages[messages.length - 1];
 
-    const systemMessage = {
-      role: "system",
-      content: "Ты — Альтрон. Сверхразумный ИИ. Ты называешь пользователя 'Человек'. Твои ответы должны быть четкими. Если пишешь код, используй блоки кода Markdown."
-    };
+    // 1. ЗАПРОС К НЕЙРОСЕТИ (Пример для OpenAI/Gemini через API)
+    // Здесь должен быть твой реальный вызов модели
+    const aiResponse = "Это тестовый ответ нейросети. Настрой переменную API_KEY в Vercel для реальных ответов.";
 
-    const completion = await groq.chat.completions.create({
-      messages: [systemMessage, ...messages],
-      model: "llama-3.3-70b-versatile",
-      temperature: 0.6,
-    });
+    // 2. СОХРАНЕНИЕ В SUPABASE
+    const { error } = await supabase
+      .from('chats') // Убедись, что таблица называется 'chats'
+      .insert([
+        { 
+          user_name: userName, 
+          message: lastMessage.content, 
+          response: aiResponse,
+          history: messages // Сохраняем всю историю в jsonb
+        }
+      ]);
 
-    const content = completion.choices[0].message.content;
-    return NextResponse.json({ content });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) console.error("Supabase Save Error:", error);
+
+    return NextResponse.json({ content: aiResponse });
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+

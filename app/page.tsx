@@ -1,190 +1,194 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
-/**
- * Основной компонент Altron в стиле Gemini
- */
-export default function AltronFullApp() {
-  // Имитируем сессию пользователя (обход логина)
-  const session = {
-    user: { 
-      name: "Guf1k", 
-      email: "dev@altron.ai",
-      avatar: "G" 
-    }
-  };
-
-  const [input, setInput] = useState("");
-  // Описываем структуру сообщения
+// Типизация для Gemini-стиля
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  id: string;
 }
 
-// Указываем тип для useState
-const [messages, setMessages] = useState<Message[]>([]);
+export default function GeminiClone() {
+  const [userProfile, setUserProfile] = useState({
+    name: "Guf1k",
+    avatar: "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+  });
+  const [showSettings, setShowSettings] = useState(false);
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Автопрокрутка вниз при новых сообщениях
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  // Инициализация профиля
+  useEffect(() => {
+    const n = localStorage.getItem("altron_name") || "Guf1k";
+    const a = localStorage.getItem("altron_avatar") || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+    setUserProfile({ name: n, avatar: a });
+  }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, loading]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-  /**
-   * Логика отправки сообщения в нейросеть
-   */
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
-    const userMessage = { role: "user" as const, content: input };
-    setMessages((prev) => [...prev, userMessage]);
-    const currentInput = input;
+    const userMsg: Message = { 
+      role: "user", 
+      content: input, 
+      id: Math.random().toString(36).substr(2, 9) 
+    };
+    
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
     try {
-      // Запрос к твоему API (убедись, что путь /api/chat верный)
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [...messages, userMessage],
+        body: JSON.stringify({ 
+          messages: [...messages, userMsg],
+          // Системная инструкция для ИИ, чтобы он вел себя как Gemini
+          systemPrompt: "You are Gemini, a creative and helpful AI assistant from Google. Respond in Russian, be concise but thorough, use markdown for structure, and maintain a friendly, professional tone."
         }),
       });
 
-      if (!response.ok) throw new Error("Ошибка API");
-
       const data = await response.json();
+      const aiResponse = data.content || data.message;
+
+      // ЭФФЕКТ ПОСТЕПЕННОГО ПОЯВЛЕНИЯ (как в Gemini)
+      const aiMsgId = Math.random().toString(36).substr(2, 9);
+      setMessages((prev) => [...prev, { role: "assistant", content: "", id: aiMsgId }]);
       
-      // Добавляем ответ от нейросети
-      setMessages((prev) => [
-        ...prev,
-        { 
-          role: "assistant", 
-          content: data.choices?.[0]?.message?.content || data.content || data.message || "Ошибка: пустой ответ" 
-        },
-      ]);
-    } catch (error) {
-      console.error("Ошибка чата:", error);
-      setMessages((prev) => [
-        ...prev,
-        { 
-          role: "assistant", 
-          content: "Произошла ошибка связи. Проверь логи в Vercel и настройки API-ключа." 
-        },
-      ]);
+      let currentDisplay = "";
+      const chunks = aiResponse.split(" ");
+      
+      for (const chunk of chunks) {
+        currentDisplay += chunk + " ";
+        setMessages((prev) => 
+          prev.map(m => m.id === aiMsgId ? { ...m, content: currentDisplay } : m)
+        );
+        // Небольшая задержка для имитации "раздумий" и плавности
+        await new Promise(r => setTimeout(r, 25));
+      }
+    } catch (e) {
+      setMessages((prev) => [...prev, { role: "assistant", content: "Произошла ошибка. Проверьте соединение.", id: "error" }]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex h-screen bg-[#131314] text-[#e3e3e3] font-sans overflow-hidden select-none">
+    <div className="flex h-screen bg-[#131314] text-[#e3e3e3] font-sans selection:bg-[#4285f4]/30 overflow-hidden">
       
-      {/* --- SIDEBAR --- */}
-      <aside className="w-[280px] bg-[#1e1f20] flex flex-col hidden lg:flex border-r border-zinc-800/20">
-        <div className="p-4 mb-4">
-          <button 
-            onClick={() => setMessages([])}
-            className="flex items-center gap-3 px-5 py-3 bg-[#1a1a1c] hover:bg-[#28292a] rounded-full text-sm transition-all shadow-md border border-zinc-800/50 text-zinc-300"
-          >
-            <span className="text-2xl font-light">+</span>
-            <span className="font-medium">Новый чат</span>
-          </button>
-        </div>
+      {/* SIDEBAR (Gemini Style) */}
+      <aside className="w-[280px] bg-[#1e1f20] hidden lg:flex flex-col p-4">
+        <button 
+          onClick={() => setMessages([])}
+          className="flex items-center gap-3 px-4 py-3 bg-[#1a1a1c] hover:bg-[#28292a] rounded-full text-sm font-medium transition-all w-fit border border-zinc-800"
+        >
+          <span className="text-2xl font-light">+</span>
+          <span>Новый чат</span>
+        </button>
         
-        <nav className="flex-1 px-4 space-y-4 overflow-y-auto scrollbar-hide">
-          <div>
-            <p className="px-2 text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Недавние</p>
-            <div className="space-y-1">
-              <div className="px-3 py-2 text-sm hover:bg-[#28292a] rounded-lg cursor-pointer truncate text-zinc-400 hover:text-zinc-200 transition-colors">
-                Текущий сеанс Altron
-              </div>
-            </div>
+        <div className="flex-1 mt-10 overflow-y-auto">
+          <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest px-2 mb-4">Недавние</p>
+          <div className="space-y-1">
+             <div className="px-3 py-2 text-sm hover:bg-[#28292a] rounded-lg cursor-pointer truncate text-zinc-400 transition-colors">
+               Диалог с Altron Gemini
+             </div>
           </div>
-        </nav>
+        </div>
 
-        <div className="p-4 border-t border-zinc-800">
-          <div className="flex items-center gap-3 p-2 hover:bg-[#28292a] rounded-2xl cursor-pointer transition-all">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center text-xs font-bold text-white">
-              {session.user.avatar}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">{session.user.name}</span>
-              <span className="text-[10px] text-zinc-500">v1.5 Pro Interface</span>
-            </div>
-          </div>
+        <div className="pt-4 border-t border-zinc-800">
+           <div onClick={() => setShowSettings(!showSettings)} className="flex items-center gap-3 p-3 hover:bg-[#28292a] rounded-2xl cursor-pointer">
+              <img src={userProfile.avatar} className="w-8 h-8 rounded-full object-cover border border-zinc-700" />
+              <div className="text-sm font-medium truncate">{userProfile.name}</div>
+           </div>
         </div>
       </aside>
 
-      {/* --- MAIN CONTENT --- */}
-      <main className="flex-1 flex flex-col relative bg-[#131314]">
+      {/* MAIN CONTENT */}
+      <main className="flex-1 flex flex-col relative overflow-hidden">
         
         {/* HEADER */}
-        <header className="p-4 flex justify-between items-center sticky top-0 bg-[#131314]/80 backdrop-blur-md z-30">
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-medium text-white ml-2 tracking-tight">
-              Altron <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/20 ml-1">AI</span>
-            </h2>
-          </div>
-          <div className="flex items-center gap-4 mr-2">
-            <div className="w-2.5 h-2.5 bg-green-500 rounded-full shadow-[0_0_10px_#22c55e]"></div>
+        <header className="p-4 flex justify-between items-center z-10 bg-[#131314]/50 backdrop-blur-xl">
+          <div className="flex items-center gap-2 px-2">
+            <span className="text-xl font-medium">Altron</span>
+            <span className="text-[10px] bg-[#28292a] text-zinc-400 px-2 py-0.5 rounded-full uppercase tracking-tighter">Gemini 1.5</span>
           </div>
         </header>
 
-        {/* CHAT VIEW */}
+        {/* CHAT AREA */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="max-w-[800px] mx-auto px-6 py-8">
+          <div className="max-w-[820px] mx-auto px-6 py-12">
             {messages.length === 0 ? (
-              <div className="h-[60vh] flex flex-col justify-center animate-in fade-in slide-in-from-bottom-8 duration-1000">
+              <div className="h-[55vh] flex flex-col justify-center">
                 <h1 className="text-5xl font-medium mb-12 bg-gradient-to-r from-[#4285f4] via-[#9b72cb] to-[#d96570] bg-clip-text text-transparent w-fit">
-                  Привет, {session.user.name}
+                  Привет, {userProfile.name}
                 </h1>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
-                    "Напиши код на TypeScript",
-                    "Как оптимизировать Vercel?",
-                    "Придумай план для проекта",
-                    "Объясни работу нейросетей"
+                    "Напиши код для игры на Python",
+                    "Составь план путешествия в Японию",
+                    "Объясни теорию относительности",
+                    "Помоги написать письмо коллеге"
                   ].map((text) => (
                     <div 
-                      key={text}
+                      key={text} 
                       onClick={() => setInput(text)}
                       className="p-5 bg-[#1e1f20] hover:bg-[#28292a] rounded-2xl cursor-pointer transition-all border border-transparent hover:border-zinc-700 text-zinc-400 hover:text-zinc-200"
                     >
-                      <p className="text-sm">{text}</p>
+                      {text}
                     </div>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="space-y-10 pb-12">
-                {messages.map((m, i) => (
-                  <div 
-                    key={i} 
-                    className={`flex gap-5 animate-in fade-in slide-in-from-bottom-2 duration-300 ${m.role === "assistant" ? "items-start" : "flex-row-reverse items-start"}`}
-                  >
-                    <div className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center shadow-lg text-[10px] font-bold ${m.role === "assistant" ? "bg-blue-600 text-white" : "bg-zinc-700 text-zinc-300"}`}>
-                      {m.role === "assistant" ? "AL" : "ME"}
+              <div className="space-y-12">
+                {messages.map((m) => (
+                  <div key={m.id} className={`flex gap-6 ${m.role === 'user' ? 'flex-row-reverse' : ''} animate-in fade-in duration-500`}>
+                    <div className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold shadow-lg overflow-hidden ${m.role === 'assistant' ? 'bg-[#1a73e8] text-white' : 'bg-zinc-700'}`}>
+                      {m.role === 'assistant' ? 'AL' : <img src={userProfile.avatar} className="w-full h-full object-cover" />}
                     </div>
-                    <div className={`text-[16px] leading-[1.7] selection:bg-blue-500/30 ${m.role === "assistant" ? "text-zinc-200 w-full" : "bg-[#28292a] px-5 py-3 rounded-[24px] max-w-[85%] text-white"}`}>
-                      {m.content}
+                    <div className={`text-[16px] leading-[1.8] tracking-normal selection:bg-blue-500/30 ${m.role === 'user' ? 'bg-[#28292a] px-6 py-3 rounded-[26px] text-white' : 'text-[#e3e3e3] w-full'}`}>
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          code({inline, className, children, ...props}: any) {
+                            return !inline ? (
+                              <div className="my-6 rounded-2xl overflow-hidden border border-zinc-800 bg-[#0a0a0a]">
+                                <div className="bg-[#1e1f20] px-5 py-2 text-[10px] text-zinc-500 font-mono flex justify-between border-b border-zinc-800/50">
+                                  <span>КОД</span>
+                                  <button className="hover:text-white transition-colors">КОПИРОВАТЬ</button>
+                                </div>
+                                <pre className="p-5 overflow-x-auto text-blue-200 font-mono text-sm leading-6"><code>{children}</code></pre>
+                              </div>
+                            ) : (
+                              <code className="bg-[#28292a] px-1.5 py-0.5 rounded text-pink-400 font-mono" {...props}>{children}</code>
+                            )
+                          },
+                          ul: ({children}) => <ul className="list-disc ml-6 space-y-2 my-4">{children}</ul>,
+                          ol: ({children}) => <ol className="list-decimal ml-6 space-y-2 my-4">{children}</ol>,
+                          p: ({children}) => <p className="mb-4 last:mb-0">{children}</p>
+                        }}
+                      >
+                        {m.content}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 ))}
                 {loading && (
-                  <div className="flex gap-5 items-start">
-                    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-[10px] font-bold animate-pulse">AL</div>
-                    <div className="mt-3 flex gap-1.5">
-                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
-                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                  <div className="flex gap-6">
+                    <div className="w-9 h-9 rounded-full bg-blue-600 animate-pulse flex items-center justify-center text-[10px] font-bold">AL</div>
+                    <div className="flex gap-1.5 mt-4">
+                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                       <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
                     </div>
                   </div>
                 )}
@@ -194,39 +198,74 @@ const [messages, setMessages] = useState<Message[]>([]);
           </div>
         </div>
 
-        {/* INPUT BAR */}
-        <div className="p-4 pb-8 bg-gradient-to-t from-[#131314] via-[#131314] to-transparent">
-          <div className="max-w-[800px] mx-auto">
-            <div className="flex items-center bg-[#1e1f20] rounded-[30px] px-6 py-2 border border-transparent focus-within:border-zinc-700 focus-within:bg-[#1a1a1c] shadow-2xl transition-all">
+        {/* INPUT (Gemini Style) */}
+        <div className="p-4 pb-10 bg-gradient-to-t from-[#131314] via-[#131314] to-transparent">
+          <div className="max-w-[820px] mx-auto">
+            <div className="flex items-center bg-[#1e1f20] rounded-[32px] px-6 py-2 transition-all border border-transparent focus-within:border-zinc-700 focus-within:bg-[#1a1a1c] shadow-2xl">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                placeholder="Введите запрос..."
-                className="w-full bg-transparent py-4 outline-none text-[16px] text-white placeholder-zinc-500"
+                placeholder="Напишите здесь..."
+                className="w-full bg-transparent py-4 outline-none text-[16px] placeholder-zinc-500"
               />
-              <button 
-                onClick={handleSend}
-                disabled={!input.trim() || loading}
-                className={`p-2 transition-all ${input.trim() ? "text-blue-500 hover:scale-110" : "text-zinc-600"}`}
-              >
-                <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-              </button>
+              <div className="flex items-center gap-3">
+                <button className="p-2 text-zinc-400 hover:text-white transition-all">
+                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                </button>
+                <button 
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  className={`p-2 rounded-full ${input.trim() ? "text-blue-500 hover:bg-blue-500/10" : "text-zinc-600"}`}
+                >
+                  <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+              </div>
             </div>
-            <p className="text-[10px] text-center mt-4 text-zinc-600 tracking-widest font-medium uppercase">
-              Altron Neural Engine // Powered by Next.js
+            <p className="text-[11px] text-center mt-4 text-zinc-500 font-light">
+              Altron может ошибаться, проверяйте важную информацию.
             </p>
           </div>
         </div>
+
+        {/* SETTINGS POPUP */}
+        {showSettings && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+             <div className="bg-[#1e1f20] p-8 rounded-[32px] border border-zinc-800 shadow-2xl w-full max-w-sm">
+                <h2 className="text-xl font-bold mb-6">Профиль</h2>
+                <input 
+                  id="p-name" placeholder="Твой ник" defaultValue={userProfile.name}
+                  className="w-full bg-[#131314] p-4 rounded-2xl mb-4 border border-zinc-800 outline-none focus:border-blue-500"
+                />
+                <input 
+                  id="p-avatar" placeholder="URL аватарки" defaultValue={userProfile.avatar}
+                  className="w-full bg-[#131314] p-4 rounded-2xl mb-6 border border-zinc-800 outline-none focus:border-blue-500"
+                />
+                <div className="flex gap-3">
+                  <button onClick={() => setShowSettings(false)} className="flex-1 py-4 bg-zinc-800 rounded-2xl font-bold">Закрыть</button>
+                  <button 
+                    onClick={() => {
+                      const n = (document.getElementById('p-name') as HTMLInputElement).value;
+                      const a = (document.getElementById('p-avatar') as HTMLInputElement).value;
+                      localStorage.setItem("altron_name", n);
+                      localStorage.setItem("altron_avatar", a);
+                      setUserProfile({ name: n, avatar: a });
+                      setShowSettings(false);
+                    }}
+                    className="flex-1 py-4 bg-blue-600 rounded-2xl font-bold hover:bg-blue-500"
+                  >
+                    Сохранить
+                  </button>
+                </div>
+             </div>
+          </div>
+        )}
       </main>
 
-      {/* GLOBAL STYLES */}
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #28292a; border-radius: 10px; }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        pre code { font-family: 'Fira Code', 'Courier New', monospace; }
       `}</style>
     </div>
   );
