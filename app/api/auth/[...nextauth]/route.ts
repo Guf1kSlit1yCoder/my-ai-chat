@@ -14,13 +14,16 @@ const handler = NextAuth({
     secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
   }),
   callbacks: {
-    async session({ session, user }) {
+    async session({ session, user }: any) {
       if (session.user) {
+        // Добавляем ID пользователя в сессию, чтобы база знала, чей это чат
         session.user.id = user.id;
       }
       return session;
     },
   },
+  // Добавляем секрет для шифрования токенов
+  secret: process.env.NEXTAUTH_SECRET,
 })
 
 export { handler as GET, handler as POST }
