@@ -16,7 +16,14 @@ export default function AltronFullApp() {
   };
 
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([]);
+  // Описываем структуру сообщения
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+// Указываем тип для useState
+const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
