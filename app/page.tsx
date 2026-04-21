@@ -92,33 +92,38 @@ export default function GeminiUltron() {
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}
                   components={{
-                    code({node, inline, className, children, ...props}) {
-                      const match = /language-(\w+)/.exec(className || '');
-                      const codeText = String(children).replace(/\n$/, '');
-                      return !inline ? (
-                        <div className="my-4 rounded-xl overflow-hidden border border-zinc-800 bg-black">
-                          <div className="flex justify-between items-center px-4 py-2 bg-[#1e1f20] text-xs">
-                            <span className="text-zinc-400 uppercase font-mono">{match ? match[1] : 'code'}</span>
-                            <button 
-                              onClick={() => copyToClipboard(codeText)}
-                              className="text-blue-400 hover:text-blue-300 transition-colors"
-                            >
-                              Копировать
-                            </button>
-                          </div>
-                          <pre className="p-4 overflow-x-auto">
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          </pre>
-                        </div>
-                      ) : (
-                        <code className="bg-zinc-800 px-1 rounded text-pink-400" {...props}>
-                          {children}
-                        </code>
-                      )
-                    }
-                  }}
+                    code({ node, className, children, ...props }: any) {
+  const match = /language-(\w+)/.exec(className || '');
+  const isInline = !match;
+  const codeText = String(children).replace(/\n$/, '');
+
+  if (isInline) {
+    return (
+      <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-pink-400 text-sm border border-zinc-700" {...props}>
+        {children}
+      </code>
+    );
+  }
+
+  return (
+    <div className="my-4 rounded-xl overflow-hidden border border-zinc-800 bg-black relative group">
+      <div className="flex justify-between items-center px-4 py-2 bg-[#1e1f20] text-xs">
+        <span className="text-zinc-400 uppercase font-mono">{match ? match[1] : 'code'}</span>
+        <button
+          onClick={() => navigator.clipboard.writeText(codeText)}
+          className="text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          Копировать
+        </button>
+      </div>
+      <pre className="p-4 overflow-x-auto bg-zinc-900/50">
+        <code className={className} {...props}>
+          {children}
+        </code>
+      </pre>
+    </div>
+  );
+}                  }}
                 >
                   {m.content}
                 </ReactMarkdown>
