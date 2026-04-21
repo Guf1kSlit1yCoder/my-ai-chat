@@ -42,7 +42,7 @@ const [messages, setMessages] = useState<Message[]>([]);
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
-    const userMessage = { role: "user", content: input };
+    const userMessage = { role: "user" as const, content: input };
     setMessages((prev) => [...prev, userMessage]);
     const currentInput = input;
     setInput("");
